@@ -39,21 +39,52 @@ def save_admins(admins):
         for admin_id in admins:
             f.write(f"{admin_id}\n")
 
+def load_users():
+    users = {}
+    try:
+        with open('users.txt', 'r') as f:
+            for line in f:
+                if line.strip():
+                    user_id, name = line.split(':', 1)
+                    users[int(user_id.strip())] = name.strip()
+    except FileNotFoundError:
+        pass
+    return users
+
+def save_users(users):
+    with open('users.txt', 'w') as f:
+        for user_id in users.keys():
+            f.write(f"{user_id}: {users[user_id]}\n")
+
 admins = load_admins()
+users = load_users()
+
 
 # /start handler
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "👋 Hello!\n\n"
         "All your further messages/photos will be sent to manager who can unlock the laundry machines.\n"
-        "Please send the 4-digit number under the QR Kaspicode on the machine here.",
+        "Please send the 4-digit number under the QR Kaspicode on the machine here."
+        "\n\n"
+        "Now you need to write the washing machine number + the gel you used when you wash.\n"
+        "Also, you can use the dryer too!\n\n"
+        "Привет!\n\n"
+        "Все твои дальнейшие сообщения/фото будут отправлены менеджеру, который может разблокировать стиральные машины.\n"
+        "Пожалуйста, отправь сюда 4-значный номер под QR Kaspicode на машинке.\n\n"
+        "Теперь все должны указывать номер машинки + используемый гель, когда стирают.\n"
+        "И ещё: сушилкой тоже можно пользоваться!\n\n",
         parse_mode='Markdown'
     )
 
 # Forwarding handler
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global admins
+    global users
     user_id = update.effective_user.id
+    if user_id not in users and user_id not in admins:
+        users[user_id] = 0
+        save_users(users)
 
     if update.message.text and update.message.text.lower().strip() == 'i am the manager':
         admins.add(user_id)
@@ -69,6 +100,31 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await update.message.reply_text("ℹ️ You are not an admin.")
         return
+
+    # check if users[user_id] is 0, if so, send a welcome message and set it to 1
+    # message: "👋 Hi! We have updated the bot. Please note:
+    #
+    # From now on, you need to write the washing machine number + the gel you used when you wash.
+    #
+    # Also, you can use the dryer too!
+    #
+    # Привет! Мы обновили бота. Пожалуйста, учти:
+    #
+    # Теперь все должны указывать номер машинки + используемый гель, когда стирают.
+    #
+    # И ещё: сушилкой тоже можно пользоваться!
+
+    if users[user_id] == 0:
+        await update.message.reply_text(
+            "👋 Hi! We have updated the bot. Please note:\n\n"
+            "From now on, you need to write the washing machine number + the gel you used when you wash.\n\n"
+            "Also, you can use the dryer too! \nThis message won't be repeated, please use /start to view it again. \n\n"
+            "Привет! Мы обновили бота. Пожалуйста, учти:\n\n"
+            "Теперь все должны указывать номер машинки + используемый гель, когда стирают.\n\n"
+            "И ещё: сушилкой тоже можно пользоваться! \n Это сообщение не будет повторяться, пожалуйста, используй /start чтобы увидеть его снова."
+        )
+        users[user_id] = 1
+        save_users(users)
 
     forwarded = False  # track if sent to at least one admin
 
